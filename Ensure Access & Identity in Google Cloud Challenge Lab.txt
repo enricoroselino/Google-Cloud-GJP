@@ -1,0 +1,83 @@
+gcloud config get-value compute/zone
+gcloud config get-value compute/region
+
+
+RULES
+Custom Securiy Role = orca_storage_manager_674
+Service Account = orca-private-cluster-869-sa
+Cluster Name = orca-cluster-959
+
+Task 0: Preparation
+
+Check Compute Engine > VM Instances Zone 
+gcloud config set compute/zone us-east1-b
+
+Task 1: Create a custom security role.
+
+nano role-definition.yaml
+
+title: "orca storage manager"
+description: "Add and update objects in Google Cloud Storage buckets"
+includedPermissions:
+- storage.buckets.get
+- storage.objects.get
+- storage.objects.list
+- storage.objects.update
+- storage.objects.create
+
+
+gcloud iam roles create orca_storage_manager_674 --project $DEVSHELL_PROJECT_ID \
+--file role-definition.yaml
+
+Task 2: Create a service account.
+
+gcloud iam service-accounts create orca-private-cluster-869-sa --display-name "Orca Private Cluster Service Account"
+
+Task 3: Bind a custom security role to a service account
+
+gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID \
+    --member serviceAccount:orca-private-cluster-869-sa@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com --role roles/monitoring.viewer
+
+gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID \
+    --member serviceAccount:orca-private-cluster-869-sa@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com --role roles/monitoring.metricWriter
+
+gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID \
+    --member serviceAccount:orca-private-cluster-869-sa@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com --role roles/logging.logWriter
+
+gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID \
+   --member serviceAccount:orca-private-cluster-869-sa@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com --role projects/$DEVSHELL_PROJECT_ID/roles/orca_storage_manager_674
+
+Task 4: Create and configure a new Kubernetes Engine private cluster
+
+JUMPHOST_IP=$(gcloud compute instances describe orca-jumphost \
+--format='get(networkInterfaces[0].networkIP)')
+
+echo $JUMPHOST_IP
+
+CHECK VPC Network > your compute engine server 
+us-east1 is 10.142.0.0
+
+SUBNET_IP_RANGE="10.142.0.0/28"
+echo $SUBNET_IP_RANGE
+
+gcloud beta container clusters create orca-cluster-959 \
+   --network orca-build-vpc \
+   --subnetwork orca-build-subnet \
+   --service-account=orca-private-cluster-869-sa@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com \
+   --enable-master-authorized-networks \
+   --master-authorized-networks $JUMPHOST_IP/32 \
+   --enable-ip-alias \
+   --enable-private-nodes \
+   --master-ipv4-cidr $SUBNET_IP_RANGE \
+   --enable-private-endpoint
+
+Task 5: Deploy an application to a private Kubernetes Engine cluster
+
+goto orca-jumphost VM then SSH
+
+gcloud container clusters get-credentials orca-cluster-959 --internal-ip --zone us-east1-b
+
+kubectl create deployment hello-server --image=gcr.io/google-samples/hello-app:1.0
+
+kubectl expose deployment hello-server --name orca-hello-service \
+   --type LoadBalancer --port 80 --target-port 8080

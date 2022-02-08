@@ -1,0 +1,43 @@
+Task 1: Create a bucket
+
+gsutil mb gs://<YOUR-BUCKET-NAME>
+
+Task 2: Create a Pub/Sub topic
+
+gcloud pubsub topics create <topicname>
+
+Task 3: Create the thumbnail Cloud Function
+
+Navigation menu > Cloud Functions > Click Create function
+
+Name : GCFunction
+
+Trigger Type : Cloud Storage
+
+Event Type : Finalize/Create
+
+Browse the bucket you have created and click Save.
+
+Click Save
+
+click Next
+
+Set Runtime as Node.js 10
+
+Entry point : thumbnail
+
+Then, from lab instructions, replace code for index.js and package.json
+
+On line 15 of index.js replace the text REPLACE_WITH_YOUR_TOPIC with the topic you created in task 2.
+
+Click Deploy
+
+Cloud Storage > Browser > Click Bucket
+
+Upload downloaded image to bucket
+
+Task 4: Remove the previous cloud engineer
+
+Go to IAM & Admin > IAM
+
+Search for Username 2 > Remove
